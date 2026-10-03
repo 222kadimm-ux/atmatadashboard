@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>نسيت كلمة المرور - أتمتة</title>
+  <link rel="stylesheet" href="auth.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div class="auth-container">
+    <div class="auth-box">
+      <div class="auth-header">
+        <h1>🔐 أتمتة</h1>
+        <p>استعادة كلمة المرور</p>
+      </div>
+
+      <p style="text-align:center; color:#666; margin-bottom:20px; font-size:0.95em;">
+        أدخلي بريدك الإلكتروني، وسنرسل لك رابط إعادة التعيين.
+      </p>
+
+      <form id="forgot-form">
+        <div class="form-group">
+          <label for="email">البريد الإلكتروني:</label>
+          <input type="email" id="email" required placeholder="example@email.com">
+        </div>
+
+        <div id="error-msg" class="error-msg hidden"></div>
+        <div id="success-msg" class="success-msg hidden"></div>
+
+        <button type="submit" class="btn-primary" id="forgot-btn">
+          📧 إرسال رابط الاستعادة
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        <p><a href="login.html">⬅️ العودة لتسجيل الدخول</a></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://ymzvhsrbmmmxxzqrmguz.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_ggRH0XJFrm4FmkUAst7pvg_JX2vH4Vv';
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    document.getElementById('forgot-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const email = document.getElementById('email').value.trim();
+      const errorMsg = document.getElementById('error-msg');
+      const successMsg = document.getElementById('success-msg');
+      const btn = document.getElementById('forgot-btn');
+
+      errorMsg.classList.add('hidden');
+      successMsg.classList.add('hidden');
+      btn.disabled = true;
+      btn.textContent = '⏳ جارٍ الإرسال...';
+
+      try {
+        const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+          redirectTo: 'https://atmatadashboard.vercel.app/reset.html'
+        });
+
+        if (error) throw error;
+
+        successMsg.innerHTML = '✅ تم إرسال رابط إعادة التعيين!<br><small>تحققي من بريدك الإلكتروني (وصندوق الرسائل غير المرغوب فيها).</small>';
+        successMsg.classList.remove('hidden');
+        btn.textContent = '✅ تم الإرسال';
+      } catch (err) {
+        console.error('خطأ:', err);
+        errorMsg.textContent = '⚠️ ' + (err.message || 'حدث خطأ');
+        errorMsg.classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = '📧 إرسال رابط الاستعادة';
+      }
+    });
+  </script>
+</body>
+</html>
