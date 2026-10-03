@@ -6,12 +6,21 @@
   <title>أتمتة - لوحة التحكم</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    (function() {
+      const user = localStorage.getItem('atmata_user');
+      if (!user) {
+        window.location.href = 'login.html';
+      }
+    })();
+  </script>
 </head>
 <body>
   <div class="container">
     <header>
       <h1>📊 أتمتة - لوحة التحكم</h1>
       <p class="subtitle">منصة إدارة الطلبات للتجار الجزائريين</p>
+      <button id="logout-btn" class="btn-logout">🚪 تسجيل الخروج</button>
     </header>
 
     <div class="shop-selector">
