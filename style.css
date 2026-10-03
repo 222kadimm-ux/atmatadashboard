@@ -215,6 +215,67 @@ footer {
   color: #888;
 }
 
+/* ========== إحصائيات متقدمة ========== */
+
+.stat-card.highlight {
+  background: linear-gradient(135deg, #f8f9ff 0%, #eef1ff 100%);
+  border: 1px solid #e0e5ff;
+}
+
+.chart-container {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  height: 300px;
+  margin-bottom: 20px;
+}
+
+.top-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.top-card {
+  background: white;
+  padding: 15px 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  display: grid;
+  grid-template-columns: 50px 2fr 1fr 1fr;
+  gap: 15px;
+  align-items: center;
+  transition: 0.3s;
+}
+
+.top-card:hover {
+  transform: translateX(-5px);
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.top-rank {
+  font-size: 1.8em;
+  text-align: center;
+}
+
+.top-name {
+  font-weight: bold;
+  color: #333;
+}
+
+.top-stat {
+  color: #667eea;
+  font-weight: 600;
+  text-align: center;
+}
+
+.top-revenue {
+  color: #27ae60;
+  font-weight: bold;
+  text-align: left;
+}
+
 @media (max-width: 768px) {
   .order-card {
     grid-template-columns: 1fr;
@@ -230,5 +291,16 @@ footer {
     position: static;
     display: block;
     margin: 10px auto 0;
+  }
+  .top-card {
+    grid-template-columns: 40px 1fr;
+    gap: 8px;
+  }
+  .top-stat, .top-revenue {
+    grid-column: 2;
+    text-align: right;
+  }
+  .chart-container {
+    height: 250px;
   }
 }
