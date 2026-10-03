@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>أتمتة - لوحة التحكم</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>📊 أتمتة - لوحة التحكم</h1>
+      <p class="subtitle">منصة إدارة الطلبات للتجار الجزائريين</p>
+    </header>
+
+    <div class="shop-selector">
+      <label for="shop-select">اختر المتجر:</label>
+      <select id="shop-select">
+        <option value="">-- جارٍ التحميل... --</option>
+      </select>
+      <button id="refresh-btn" class="btn-refresh">🔄 تحديث</button>
+    </div>
+
+    <div id="loading" class="loading">⏳ جارٍ التحميل...</div>
+
+    <div id="dashboard" class="dashboard hidden">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">📦</div>
+          <div class="stat-value" id="total-orders">0</div>
+          <div class="stat-label">إجمالي الطلبات</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">💰</div>
+          <div class="stat-value" id="total-sales">0</div>
+          <div class="stat-label">إجمالي المبيعات (د.ج)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📅</div>
+          <div class="stat-value" id="today-orders">0</div>
+          <div class="stat-label">طلبات اليوم</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">📈</div>
+          <div class="stat-value" id="avg-order">0</div>
+          <div class="stat-label">متوسط الطلب (د.ج)</div>
+        </div>
+      </div>
+
+      <h2>📋 الطلبات الأخيرة</h2>
+      <div id="orders-list" class="orders-list"></div>
+    </div>
+
+    <footer>
+      <p>© 2026 أتمتة - جميع الحقوق محفوظة</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
