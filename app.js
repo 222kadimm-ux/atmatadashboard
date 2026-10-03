@@ -1,5 +1,5 @@
 // ========================================
-// app.js - لوحة التحكم مع حماية المستخدم
+// app.js - لوحة التحكم مع إحصائيات متقدمة
 // ========================================
 
 const SUPABASE_URL = 'https://ymzvhsrbmmmxxzqrmguz.supabase.co';
@@ -9,6 +9,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentShopId = null;
 let currentUser = null;
+let salesChart = null;
 
 // ========================================
 // تحميل بيانات المستخدم
@@ -38,9 +39,9 @@ function logout() {
 }
 
 // ========================================
-// تحميل المتجر (متجر المستخدم فقط)
+// تحميل المتجر
 // ========================================
-async function loadShops() {
+async function loadShop() {
   const { data, error } = await supabaseClient
     .from('shops')
     .select('id, name, emoji, username')
@@ -49,7 +50,7 @@ async function loadShops() {
 
   if (error || !data) {
     console.error('خطأ تحميل المتجر:', error);
-    document.getElementById('loading').innerHTML = '⚠️ لم يتم العثور على متجرك. تواصل مع الدعم.';
+    document.getElementById('loading').innerHTML = '⚠️ لم يتم العثور على متجرك.';
     return;
   }
 
@@ -63,51 +64,189 @@ async function loadShops() {
   select.appendChild(option);
 
   currentShopId = data.id;
-
-  // تحميل تلقائي
-  await loadStats(currentShopId);
-  await loadOrders(currentShopId);
-
-  document.getElementById('loading').classList.add('hidden');
-  document.getElementById('dashboard').classList.remove('hidden');
 }
 
 // ========================================
-// تحميل الإحصائيات
+// تحميل الإحصائيات المتقدمة
 // ========================================
-async function loadStats(shopId) {
-  const { data: orders, error } = await supabaseClient
-    .from('orders')
-    .select('*')
-    .eq('shop_id', shopId);
+async function loadAdvancedStats() {
+  try {
+    const { data, error } = await supabaseClient
+      .rpc('get_shop_advanced_stats', { shop_id_input: currentShopId });
 
-  if (error) {
-    console.error('خطأ:', error);
-    return;
+    if (error) throw error;
+
+    const stats = data;
+
+    document.getElementById('total-orders').textContent = stats.total_orders || 0;
+    document.getElementById('total-sales').textContent = (stats.total_sales || 0).toLocaleString('ar-DZ');
+    document.getElementById('today-orders').textContent = stats.today_orders || 0;
+    document.getElementById('avg-order').textContent = Math.round(stats.avg_order || 0).toLocaleString('ar-DZ');
+
+    document.getElementById('week-orders').textContent = stats.week_orders || 0;
+    document.getElementById('week-sales').textContent = (stats.week_sales || 0).toLocaleString('ar-DZ');
+    document.getElementById('month-orders').textContent = stats.month_orders || 0;
+    document.getElementById('month-sales').textContent = (stats.month_sales || 0).toLocaleString('ar-DZ');
+
+  } catch (err) {
+    console.error('خطأ الإحصائيات:', err);
   }
-
-  const totalOrders = orders.length;
-  const totalSales = orders.reduce((sum, o) => sum + (o.total || 0), 0);
-  const avgOrder = totalOrders > 0 ? Math.round(totalSales / totalOrders) : 0;
-  const today = new Date().toISOString().split('T')[0];
-  const todayOrders = orders.filter(o => o.created_at && o.created_at.startsWith(today)).length;
-
-  document.getElementById('total-orders').textContent = totalOrders;
-  document.getElementById('total-sales').textContent = totalSales.toLocaleString('ar-DZ');
-  document.getElementById('today-orders').textContent = todayOrders;
-  document.getElementById('avg-order').textContent = avgOrder.toLocaleString('ar-DZ');
 }
 
 // ========================================
-// تحميل الطلبات
+// رسم بياني للمبيعات
 // ========================================
-async function loadOrders(shopId) {
+async function loadSalesChart() {
+  try {
+    const { data, error } = await supabaseClient
+      .rpc('get_daily_sales', { shop_id_input: currentShopId });
+
+    if (error) throw error;
+
+    const labels = [];
+    const salesData = [];
+
+    // آخر 7 أيام
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+
+      const dayData = (data || []).find(d => d.date && d.date.startsWith(dateStr));
+      labels.push(date.toLocaleDateString('ar-DZ', { weekday: 'short', day: 'numeric' }));
+      salesData.push(dayData ? dayData.sales : 0);
+    }
+
+    const ctx = document.getElementById('sales-chart').getContext('2d');
+
+    if (salesChart) salesChart.destroy();
+
+    salesChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'المبيعات (د.ج)',
+          data: salesData,
+          borderColor: '#667eea',
+          backgroundColor: 'rgba(102, 126, 234, 0.1)',
+          tension: 0.4,
+          fill: true,
+          pointBackgroundColor: '#667eea',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointRadius: 5
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: {
+              callback: function(value) {
+                return value.toLocaleString('ar-DZ');
+              }
+            }
+          }
+        }
+      }
+    });
+
+  } catch (err) {
+    console.error('خطأ الرسم:', err);
+  }
+}
+
+// ========================================
+// المنتجات الأكثر مبيعاً
+// ========================================
+async function loadTopProducts() {
+  try {
+    const { data, error } = await supabaseClient
+      .rpc('get_top_products', { shop_id_input: currentShopId });
+
+    if (error) throw error;
+
+    const container = document.getElementById('top-products');
+    container.innerHTML = '';
+
+    if (!data || data.length === 0) {
+      container.innerHTML = '<p style="text-align:center;color:#666;padding:20px;">📭 لا توجد بيانات بعد</p>';
+      return;
+    }
+
+    data.forEach((product, index) => {
+      const medal = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'][index] || '•';
+      const card = document.createElement('div');
+      card.className = 'top-card';
+      card.innerHTML = `
+        <div class="top-rank">${medal}</div>
+        <div class="top-name">${product.name}</div>
+        <div class="top-stat">${product.total_quantity} مبيعة</div>
+        <div class="top-revenue">${(product.total_revenue || 0).toLocaleString('ar-DZ')} د.ج</div>
+      `;
+      container.appendChild(card);
+    });
+
+  } catch (err) {
+    console.error('خطأ المنتجات:', err);
+  }
+}
+
+// ========================================
+// العملاء الأكثر شراءً
+// ========================================
+async function loadTopCustomers() {
+  try {
+    const { data, error } = await supabaseClient
+      .rpc('get_top_customers', { shop_id_input: currentShopId });
+
+    if (error) throw error;
+
+    const container = document.getElementById('top-customers');
+    container.innerHTML = '';
+
+    if (!data || data.length === 0) {
+      container.innerHTML = '<p style="text-align:center;color:#666;padding:20px;">📭 لا توجد بيانات بعد</p>';
+      return;
+    }
+
+    data.forEach((customer, index) => {
+      const medal = ['👑', '⭐', '🌟', '✨', '💫'][index] || '•';
+      const card = document.createElement('div');
+      card.className = 'top-card';
+      card.innerHTML = `
+        <div class="top-rank">${medal}</div>
+        <div class="top-name">
+          ${customer.customer_name}
+          <small style="display:block;color:#888;font-weight:normal;">${customer.customer_phone || ''}</small>
+        </div>
+        <div class="top-stat">${customer.orders_count} طلب</div>
+        <div class="top-revenue">${(customer.total_spent || 0).toLocaleString('ar-DZ')} د.ج</div>
+      `;
+      container.appendChild(card);
+    });
+
+  } catch (err) {
+    console.error('خطأ العملاء:', err);
+  }
+}
+
+// ========================================
+// الطلبات الأخيرة
+// ========================================
+async function loadOrders() {
   const { data, error } = await supabaseClient
     .from('orders')
     .select('*')
-    .eq('shop_id', shopId)
+    .eq('shop_id', currentShopId)
     .order('created_at', { ascending: false })
-    .limit(20);
+    .limit(10);
 
   if (error) {
     console.error('خطأ:', error);
@@ -157,30 +296,41 @@ async function loadOrders(shopId) {
 }
 
 // ========================================
+// تحميل كل شيء
+// ========================================
+async function loadAll() {
+  document.getElementById('loading').classList.remove('hidden');
+  document.getElementById('dashboard').classList.add('hidden');
+
+  await loadShop();
+  if (!currentShopId) return;
+
+  await Promise.all([
+    loadAdvancedStats(),
+    loadSalesChart(),
+    loadTopProducts(),
+    loadTopCustomers(),
+    loadOrders()
+  ]);
+
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('dashboard').classList.remove('hidden');
+}
+
+// ========================================
 // التهيئة
 // ========================================
 document.addEventListener('DOMContentLoaded', async () => {
-  // التحقق من تسجيل الدخول
   currentUser = loadUser();
   if (!currentUser) return;
 
-  // زر تسجيل الخروج
   const logoutBtn = document.getElementById('logout-btn');
-  if (logoutBtn) {
-    logoutBtn.addEventListener('click', logout);
-  }
+  if (logoutBtn) logoutBtn.addEventListener('click', logout);
 
-  // تحميل متجر المستخدم
-  await loadShops();
+  await loadAll();
 
-  // زر التحديث
   const refreshBtn = document.getElementById('refresh-btn');
   if (refreshBtn) {
-    refreshBtn.addEventListener('click', async () => {
-      if (currentShopId) {
-        await loadStats(currentShopId);
-        await loadOrders(currentShopId);
-      }
-    });
+    refreshBtn.addEventListener('click', loadAll);
   }
 });
