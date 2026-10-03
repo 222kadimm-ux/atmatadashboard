@@ -1,40 +1,90 @@
+// ========================================
+// app.js - لوحة التحكم مع حماية المستخدم
+// ========================================
+
 const SUPABASE_URL = 'https://ymzvhsrbmmmxxzqrmguz.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_ggRH0XJFrm4FmkUAst7pvg_JX2vH4Vv';
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let currentShopId = null;
+let currentUser = null;
 
+// ========================================
+// تحميل بيانات المستخدم
+// ========================================
+function loadUser() {
+  const userStr = localStorage.getItem('atmata_user');
+  if (!userStr) {
+    window.location.href = 'login.html';
+    return null;
+  }
+
+  try {
+    return JSON.parse(userStr);
+  } catch (e) {
+    localStorage.removeItem('atmata_user');
+    window.location.href = 'login.html';
+    return null;
+  }
+}
+
+// ========================================
+// تسجيل الخروج
+// ========================================
+function logout() {
+  localStorage.removeItem('atmata_user');
+  window.location.href = 'login.html';
+}
+
+// ========================================
+// تحميل المتجر (متجر المستخدم فقط)
+// ========================================
 async function loadShops() {
   const { data, error } = await supabaseClient
     .from('shops')
     .select('id, name, emoji, username')
-    .eq('active', true)
-    .order('name');
+    .eq('id', currentUser.shop_id)
+    .single();
 
-  if (error) {
-    console.error('خطأ:', error);
+  if (error || !data) {
+    console.error('خطأ تحميل المتجر:', error);
+    document.getElementById('loading').innerHTML = '⚠️ لم يتم العثور على متجرك. تواصل مع الدعم.';
     return;
   }
 
   const select = document.getElementById('shop-select');
-  select.innerHTML = '<option value="">-- اختر متجراً --</option>';
+  select.innerHTML = '';
 
-  data.forEach(shop => {
-    const option = document.createElement('option');
-    option.value = shop.id;
-    option.textContent = `${shop.emoji || '🏪'} ${shop.name} (@${shop.username})`;
-    select.appendChild(option);
-  });
+  const option = document.createElement('option');
+  option.value = data.id;
+  option.textContent = `${data.emoji || '🏪'} ${data.name} (@${data.username})`;
+  option.selected = true;
+  select.appendChild(option);
+
+  currentShopId = data.id;
+
+  // تحميل تلقائي
+  await loadStats(currentShopId);
+  await loadOrders(currentShopId);
+
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('dashboard').classList.remove('hidden');
 }
 
+// ========================================
+// تحميل الإحصائيات
+// ========================================
 async function loadStats(shopId) {
   const { data: orders, error } = await supabaseClient
     .from('orders')
     .select('*')
     .eq('shop_id', shopId);
 
-  if (error) return;
+  if (error) {
+    console.error('خطأ:', error);
+    return;
+  }
 
   const totalOrders = orders.length;
   const totalSales = orders.reduce((sum, o) => sum + (o.total || 0), 0);
@@ -48,6 +98,9 @@ async function loadStats(shopId) {
   document.getElementById('avg-order').textContent = avgOrder.toLocaleString('ar-DZ');
 }
 
+// ========================================
+// تحميل الطلبات
+// ========================================
 async function loadOrders(shopId) {
   const { data, error } = await supabaseClient
     .from('orders')
@@ -56,7 +109,10 @@ async function loadOrders(shopId) {
     .order('created_at', { ascending: false })
     .limit(20);
 
-  if (error) return;
+  if (error) {
+    console.error('خطأ:', error);
+    return;
+  }
 
   const list = document.getElementById('orders-list');
   list.innerHTML = '';
@@ -100,32 +156,31 @@ async function loadOrders(shopId) {
   });
 }
 
+// ========================================
+// التهيئة
+// ========================================
 document.addEventListener('DOMContentLoaded', async () => {
+  // التحقق من تسجيل الدخول
+  currentUser = loadUser();
+  if (!currentUser) return;
+
+  // زر تسجيل الخروج
+  const logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', logout);
+  }
+
+  // تحميل متجر المستخدم
   await loadShops();
 
-  document.getElementById('shop-select').addEventListener('change', async (e) => {
-    const shopId = e.target.value;
-
-    if (!shopId) {
-      document.getElementById('dashboard').classList.add('hidden');
-      return;
-    }
-
-    currentShopId = shopId;
-    document.getElementById('loading').classList.remove('hidden');
-    document.getElementById('dashboard').classList.add('hidden');
-
-    await loadStats(shopId);
-    await loadOrders(shopId);
-
-    document.getElementById('loading').classList.add('hidden');
-    document.getElementById('dashboard').classList.remove('hidden');
-  });
-
-  document.getElementById('refresh-btn').addEventListener('click', async () => {
-    if (currentShopId) {
-      await loadStats(currentShopId);
-      await loadOrders(currentShopId);
-    }
-  });
+  // زر التحديث
+  const refreshBtn = document.getElementById('refresh-btn');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', async () => {
+      if (currentShopId) {
+        await loadStats(currentShopId);
+        await loadOrders(currentShopId);
+      }
+    });
+  }
 });
