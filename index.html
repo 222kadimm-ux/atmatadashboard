@@ -6,6 +6,7 @@
   <title>أتمتة - لوحة التحكم</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script>
     (function() {
       const user = localStorage.getItem('atmata_user');
@@ -24,7 +25,7 @@
     </header>
 
     <div class="shop-selector">
-      <label for="shop-select">اختر المتجر:</label>
+      <label for="shop-select">متجرك:</label>
       <select id="shop-select">
         <option value="">-- جارٍ التحميل... --</option>
       </select>
@@ -34,6 +35,7 @@
     <div id="loading" class="loading">⏳ جارٍ التحميل...</div>
 
     <div id="dashboard" class="dashboard hidden">
+      <!-- الإحصائيات السريعة -->
       <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-icon">📦</div>
@@ -57,7 +59,46 @@
         </div>
       </div>
 
-      <h2>📋 الطلبات الأخيرة</h2>
+      <!-- إحصائيات الأسبوع والشهر -->
+      <div class="stats-grid" style="margin-top:15px;">
+        <div class="stat-card highlight">
+          <div class="stat-icon">📅</div>
+          <div class="stat-value" id="week-orders">0</div>
+          <div class="stat-label">طلبات الأسبوع</div>
+        </div>
+        <div class="stat-card highlight">
+          <div class="stat-icon">💵</div>
+          <div class="stat-value" id="week-sales">0</div>
+          <div class="stat-label">مبيعات الأسبوع (د.ج)</div>
+        </div>
+        <div class="stat-card highlight">
+          <div class="stat-icon">📆</div>
+          <div class="stat-value" id="month-orders">0</div>
+          <div class="stat-label">طلبات الشهر</div>
+        </div>
+        <div class="stat-card highlight">
+          <div class="stat-icon">💸</div>
+          <div class="stat-value" id="month-sales">0</div>
+          <div class="stat-label">مبيعات الشهر (د.ج)</div>
+        </div>
+      </div>
+
+      <!-- رسم بياني للمبيعات -->
+      <h2 style="margin-top:30px;">📈 المبيعات (آخر 7 أيام)</h2>
+      <div class="chart-container">
+        <canvas id="sales-chart"></canvas>
+      </div>
+
+      <!-- المنتجات الأكثر مبيعاً -->
+      <h2 style="margin-top:30px;">🏆 المنتجات الأكثر مبيعاً</h2>
+      <div id="top-products" class="top-list"></div>
+
+      <!-- العملاء الأكثر شراءً -->
+      <h2 style="margin-top:30px;">👑 العملاء الأكثر شراءً</h2>
+      <div id="top-customers" class="top-list"></div>
+
+      <!-- الطلبات الأخيرة -->
+      <h2 style="margin-top:30px;">📋 الطلبات الأخيرة</h2>
       <div id="orders-list" class="orders-list"></div>
     </div>
 
