@@ -1,23 +1,11 @@
 // ========================================
-// auth.js - تسجيل الدخول والتسجيل
+// auth.js - Supabase Auth
 // ========================================
 
 const SUPABASE_URL = 'https://ymzvhsrbmmmxxzqrmguz.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_ggRH0XJFrm4FmkUAst7pvg_JX2vH4Vv';
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-// ========================================
-// تشفير كلمة المرور (بسيط - للمشروع الصغير)
-// ========================================
-async function hashPassword(password) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password + 'atmata_salt_2026');
-  const hash = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hash))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-}
 
 // ========================================
 // تسجيل الدخول
@@ -28,49 +16,56 @@ async function handleLogin(e) {
   const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
   const errorMsg = document.getElementById('error-msg');
+  const successMsg = document.getElementById('success-msg');
   const btn = document.getElementById('login-btn');
 
   errorMsg.classList.add('hidden');
+  if (successMsg) successMsg.classList.add('hidden');
   btn.disabled = true;
   btn.textContent = '⏳ جارٍ التحقق...';
 
   try {
-    const passwordHash = await hashPassword(password);
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email: email,
+      password: password
+    });
 
-    const { data, error } = await supabaseClient
+    if (error) throw error;
+
+    // البحث عن متجر المستخدم
+    const { data: userData, error: userError } = await supabaseClient
       .from('users')
-      .select('id, email, shop_id, password_hash')
+      .select('shop_id')
       .eq('email', email)
       .single();
 
-    if (error || !data) {
-      throw new Error('البريد الإلكتروني أو كلمة المرور غير صحيحة');
-    }
-
-    if (data.password_hash !== passwordHash) {
-      throw new Error('البريد الإلكتروني أو كلمة المرور غير صحيحة');
+    if (userError || !userData) {
+      // إذا لم يكن هناك صف في users، ننشئه
+      const shopId = prompt('أدخل معرف متجرك (Shop ID):');
+      if (shopId) {
+        await supabaseClient.from('users').insert([{
+          email: email,
+          shop_id: parseInt(shopId),
+          password_hash: 'supabase_auth'
+        }]);
+      }
     }
 
     // حفظ الجلسة
     localStorage.setItem('atmata_user', JSON.stringify({
-      id: data.id,
-      email: data.email,
-      shop_id: data.shop_id,
+      id: data.user.id,
+      email: data.user.email,
+      shop_id: userData?.shop_id || null,
       login_at: new Date().toISOString()
     }));
 
-    // تحديث آخر تسجيل دخول
-    await supabaseClient
-      .from('users')
-      .update({ last_login: new Date().toISOString() })
-      .eq('id', data.id);
-
-    // التحويل إلى لوحة التحكم
     window.location.href = 'index.html';
 
   } catch (err) {
     console.error('خطأ:', err);
-    errorMsg.textContent = '⚠️ ' + err.message;
+    errorMsg.textContent = '⚠️ ' + (err.message === 'Invalid login credentials' 
+      ? 'البريد الإلكتروني أو كلمة المرور غير صحيحة' 
+      : err.message);
     errorMsg.classList.remove('hidden');
     btn.disabled = false;
     btn.textContent = '🔐 تسجيل الدخول';
@@ -96,7 +91,6 @@ async function handleRegister(e) {
   btn.textContent = '⏳ جارٍ التسجيل...';
 
   try {
-    // التحقق من صحة المدخلات
     if (password.length < 6) {
       throw new Error('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
     }
@@ -116,42 +110,37 @@ async function handleRegister(e) {
       throw new Error('لم يتم العثور على المتجر. تحقق من Shop ID');
     }
 
-    // التحقق من عدم وجود البريد
-    const { data: existing } = await supabaseClient
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .single();
+    // إنشاء الحساب في Supabase Auth
+    const { data: authData, error: authError } = await supabaseClient.auth.signUp({
+      email: email,
+      password: password
+    });
 
-    if (existing) {
-      throw new Error('البريد الإلكتروني مسجل بالفعل');
-    }
+    if (authError) throw authError;
 
-    // إنشاء الحساب
-    const passwordHash = await hashPassword(password);
-
-    const { data, error } = await supabaseClient
+    // حفظ بيانات المستخدم في جدول users
+    const { error: dbError } = await supabaseClient
       .from('users')
       .insert([{
-        email,
-        password_hash: passwordHash,
+        email: email,
+        password_hash: 'supabase_auth',
         shop_id: shopId
-      }])
-      .select()
-      .single();
+      }]);
 
-    if (error) throw error;
+    if (dbError && !dbError.message.includes('duplicate')) {
+      throw dbError;
+    }
 
-    successMsg.textContent = `✅ تم إنشاء الحساب! مرحباً ${shop.name}. سيتم تحويلك...`;
+    successMsg.innerHTML = `✅ تم إنشاء الحساب!<br><small>مرحباً ${shop.name}. تحققي من بريدك لتأكيد الحساب.</small>`;
     successMsg.classList.remove('hidden');
 
     setTimeout(() => {
       window.location.href = 'login.html';
-    }, 2000);
+    }, 3000);
 
   } catch (err) {
     console.error('خطأ:', err);
-    errorMsg.textContent = '⚠️ ' + err.message;
+    errorMsg.textContent = '⚠️ ' + (err.message || 'حدث خطأ');
     errorMsg.classList.remove('hidden');
     btn.disabled = false;
     btn.textContent = '✨ إنشاء الحساب';
@@ -165,11 +154,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const loginForm = document.getElementById('login-form');
   const registerForm = document.getElementById('register-form');
 
-  if (loginForm) {
-    loginForm.addEventListener('submit', handleLogin);
-  }
-
-  if (registerForm) {
-    registerForm.addEventListener('submit', handleRegister);
-  }
+  if (loginForm) loginForm.addEventListener('submit', handleLogin);
+  if (registerForm) registerForm.addEventListener('submit', handleRegister);
 });
