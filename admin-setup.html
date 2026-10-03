@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>إعداد المدير</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body style="font-family: sans-serif; padding: 40px; max-width: 600px; margin: auto;">
+  <h1>إعداد حساب المدير</h1>
+  <p>استخدمي هذه الصفحة مرة واحدة فقط لإنشاء حساب المدير.</p>
+
+  <input type="email" id="email" placeholder="البريد" style="width:100%;padding:12px;margin:10px 0;border:2px solid #ddd;border-radius:8px;">
+  <input type="password" id="password" placeholder="كلمة المرور" style="width:100%;padding:12px;margin:10px 0;border:2px solid #ddd;border-radius:8px;">
+  <button onclick="setup()" style="width:100%;padding:15px;background:#667eea;color:white;border:none;border-radius:8px;font-size:1.1em;cursor:pointer;">
+    إنشاء حساب المدير
+  </button>
+
+  <pre id="result" style="background:#f5f5f5;padding:15px;margin-top:20px;border-radius:8px;"></pre>
+
+  <script>
+    const supabaseClient = supabase.createClient(
+      'https://ymzvhsrbmmmxxzqrmguz.supabase.co',
+      'sb_publishable_ggRH0XJFrm4FmkUAst7pvg_JX2vH4Vv'
+    );
+
+    async function hashPassword(password) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(password + 'atmata_admin_salt');
+      const hash = await crypto.subtle.digest('SHA-256', data);
+      return Array.from(new Uint8Array(hash))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+    }
+
+    async function setup() {
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const result = document.getElementById('result');
+
+      if (!email || password.length < 6) {
+        result.textContent = '⚠️ أدخلي بريداً صحيحاً وكلمة مرور 6 أحرف على الأقل';
+        return;
+      }
+
+      const passwordHash = await hashPassword(password);
+
+      const { data, error } = await supabaseClient
+        .from('admins')
+        .insert([{ email, password_hash: passwordHash }])
+        .select()
+        .single();
+
+      if (error) {
+        result.textContent = '❌ خطأ: ' + error.message;
+        return;
+      }
+
+      result.textContent = '✅ تم إنشاء حساب المدير!\n\nالبريد: ' + email + '\n\nاذهبي إلى admin-login.html وسجلي دخول.';
+    }
+  </script>
+</body>
+</html>
