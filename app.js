@@ -1,5 +1,5 @@
 // ========================================
-// app.js - لوحة التحكم مع إحصائيات متقدمة
+// app.js - لوحة التحكم مع Error Handling
 // ========================================
 
 const SUPABASE_URL = 'https://ymzvhsrbmmmxxzqrmguz.supabase.co';
@@ -12,7 +12,26 @@ let currentUser = null;
 let salesChart = null;
 
 // ========================================
-// تحميل بيانات المستخدم
+// Error Handler
+// ========================================
+function handleError(error, context = '') {
+  console.error(`[${context}]`, error);
+  
+  // رسالة عامة للمستخدم (لا تكشف التفاصيل)
+  const userMessage = '⚠️ حدث خطأ. حاول تحديث الصفحة.';
+  
+  // إذا كانت الجلسة منتهية
+  if (error?.message?.includes('JWT') || error?.message?.includes('auth')) {
+    localStorage.removeItem('atmata_user');
+    window.location.href = 'login.html';
+    return;
+  }
+  
+  return userMessage;
+}
+
+// ========================================
+// التحقق من الجلسة
 // ========================================
 function loadUser() {
   const userStr = localStorage.getItem('atmata_user');
@@ -22,7 +41,16 @@ function loadUser() {
   }
 
   try {
-    return JSON.parse(userStr);
+    const user = JSON.parse(userStr);
+    
+    // التحقق من انتهاء الجلسة
+    if (user.expires_at && Date.now() > user.expires_at) {
+      localStorage.removeItem('atmata_user');
+      window.location.href = 'login.html';
+      return null;
+    }
+    
+    return user;
   } catch (e) {
     localStorage.removeItem('atmata_user');
     window.location.href = 'login.html';
@@ -42,28 +70,31 @@ function logout() {
 // تحميل المتجر
 // ========================================
 async function loadShop() {
-  const { data, error } = await supabaseClient
-    .from('shops')
-    .select('id, name, emoji, username')
-    .eq('id', currentUser.shop_id)
-    .single();
+  try {
+    const { data, error } = await supabaseClient
+      .from('shops')
+      .select('id, name, emoji, username')
+      .eq('id', currentUser.shop_id)
+      .single();
 
-  if (error || !data) {
-    console.error('خطأ تحميل المتجر:', error);
-    document.getElementById('loading').innerHTML = '⚠️ لم يتم العثور على متجرك.';
-    return;
+    if (error || !data) {
+      document.getElementById('loading').innerHTML = '⚠️ لم يتم العثور على متجرك.';
+      return;
+    }
+
+    const select = document.getElementById('shop-select');
+    select.innerHTML = '';
+
+    const option = document.createElement('option');
+    option.value = data.id;
+    option.textContent = `${data.emoji || '🏪'} ${data.name} (@${data.username})`;
+    option.selected = true;
+    select.appendChild(option);
+
+    currentShopId = data.id;
+  } catch (err) {
+    handleError(err, 'loadShop');
   }
-
-  const select = document.getElementById('shop-select');
-  select.innerHTML = '';
-
-  const option = document.createElement('option');
-  option.value = data.id;
-  option.textContent = `${data.emoji || '🏪'} ${data.name} (@${data.username})`;
-  option.selected = true;
-  select.appendChild(option);
-
-  currentShopId = data.id;
 }
 
 // ========================================
@@ -89,7 +120,7 @@ async function loadAdvancedStats() {
     document.getElementById('month-sales').textContent = (stats.month_sales || 0).toLocaleString('ar-DZ');
 
   } catch (err) {
-    console.error('خطأ الإحصائيات:', err);
+    handleError(err, 'loadAdvancedStats');
   }
 }
 
@@ -106,7 +137,6 @@ async function loadSalesChart() {
     const labels = [];
     const salesData = [];
 
-    // آخر 7 أيام
     for (let i = 6; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
@@ -141,24 +171,18 @@ async function loadSalesChart() {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false }
-        },
+        plugins: { legend: { display: false } },
         scales: {
           y: {
             beginAtZero: true,
-            ticks: {
-              callback: function(value) {
-                return value.toLocaleString('ar-DZ');
-              }
-            }
+            ticks: { callback: function(value) { return value.toLocaleString('ar-DZ'); } }
           }
         }
       }
     });
 
   } catch (err) {
-    console.error('خطأ الرسم:', err);
+    handleError(err, 'loadSalesChart');
   }
 }
 
@@ -194,7 +218,7 @@ async function loadTopProducts() {
     });
 
   } catch (err) {
-    console.error('خطأ المنتجات:', err);
+    handleError(err, 'loadTopProducts');
   }
 }
 
@@ -233,7 +257,7 @@ async function loadTopCustomers() {
     });
 
   } catch (err) {
-    console.error('خطأ العملاء:', err);
+    handleError(err, 'loadTopCustomers');
   }
 }
 
@@ -241,58 +265,60 @@ async function loadTopCustomers() {
 // الطلبات الأخيرة
 // ========================================
 async function loadOrders() {
-  const { data, error } = await supabaseClient
-    .from('orders')
-    .select('*')
-    .eq('shop_id', currentShopId)
-    .order('created_at', { ascending: false })
-    .limit(10);
+  try {
+    const { data, error } = await supabaseClient
+      .from('orders')
+      .select('*')
+      .eq('shop_id', currentShopId)
+      .order('created_at', { ascending: false })
+      .limit(10);
 
-  if (error) {
-    console.error('خطأ:', error);
-    return;
-  }
+    if (error) throw error;
 
-  const list = document.getElementById('orders-list');
-  list.innerHTML = '';
+    const list = document.getElementById('orders-list');
+    list.innerHTML = '';
 
-  if (data.length === 0) {
-    list.innerHTML = '<p style="text-align:center;color:#666;padding:20px;">📭 لا توجد طلبات بعد</p>';
-    return;
-  }
-
-  data.forEach(order => {
-    const card = document.createElement('div');
-    card.className = `order-card ${order.status || 'pending'}`;
-
-    const statusText = {
-      pending: '🔵 قيد التحضير',
-      shipping: '🟡 في الطريق',
-      delivered: '🟢 تم التسليم',
-      cancelled: '🔴 ملغى'
-    }[order.status] || 'غير معروف';
-
-    let itemsList = '';
-    try {
-      const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
-      itemsList = items.map(i => `${i.name} × ${i.quantity}`).join(' | ');
-    } catch (e) {
-      itemsList = '—';
+    if (data.length === 0) {
+      list.innerHTML = '<p style="text-align:center;color:#666;padding:20px;">📭 لا توجد طلبات بعد</p>';
+      return;
     }
 
-    card.innerHTML = `
-      <div class="order-number">#${order.order_number}</div>
-      <div class="order-customer">
-        <strong>${order.customer_name || '—'}</strong>
-        <small>${order.customer_phone || ''} - ${order.customer_wilaya || ''}</small>
-        <small>${itemsList}</small>
-      </div>
-      <div class="order-total">${(order.total || 0).toLocaleString('ar-DZ')} د.ج</div>
-      <div class="order-status status-${order.status || 'pending'}">${statusText}</div>
-    `;
+    data.forEach(order => {
+      const card = document.createElement('div');
+      card.className = `order-card ${order.status || 'pending'}`;
 
-    list.appendChild(card);
-  });
+      const statusText = {
+        pending: '🔵 قيد التحضير',
+        shipping: '🟡 في الطريق',
+        delivered: '🟢 تم التسليم',
+        cancelled: '🔴 ملغى'
+      }[order.status] || 'غير معروف';
+
+      let itemsList = '';
+      try {
+        const items = typeof order.items === 'string' ? JSON.parse(order.items) : order.items;
+        itemsList = items.map(i => `${i.name} × ${i.quantity}`).join(' | ');
+      } catch (e) {
+        itemsList = '—';
+      }
+
+      card.innerHTML = `
+        <div class="order-number">#${order.order_number}</div>
+        <div class="order-customer">
+          <strong>${order.customer_name || '—'}</strong>
+          <small>${order.customer_phone || ''} - ${order.customer_wilaya || ''}</small>
+          <small>${itemsList}</small>
+        </div>
+        <div class="order-total">${(order.total || 0).toLocaleString('ar-DZ')} د.ج</div>
+        <div class="order-status status-${order.status || 'pending'}">${statusText}</div>
+      `;
+
+      list.appendChild(card);
+    });
+
+  } catch (err) {
+    handleError(err, 'loadOrders');
+  }
 }
 
 // ========================================
