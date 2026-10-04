@@ -225,6 +225,10 @@ body {
   cursor: pointer;
   transition: 0.3s;
   font-family: inherit;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .tab.active {
@@ -236,6 +240,15 @@ body {
 .tab:hover:not(.active) {
   border-color: #667eea;
   color: #667eea;
+}
+
+.badge-count {
+  background: #e74c3c;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.75em;
+  font-weight: bold;
 }
 
 /* ========== Data Lists ========== */
@@ -287,11 +300,94 @@ body {
 .badge-pending { background: #fff3cd; color: #856404; }
 .badge-cancelled { background: #f8d7da; color: #721c24; }
 
-.loading {
-  text-align: center;
-  padding: 40px;
-  font-size: 1.2em;
+/* ========== Receipt Cards ========== */
+.receipt-card {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+  border-right: 5px solid #f39c12;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  transition: 0.3s;
+}
+
+.receipt-card.receipt-pending { border-right-color: #f39c12; }
+.receipt-card.receipt-approved { border-right-color: #27ae60; }
+.receipt-card.receipt-rejected { border-right-color: #e74c3c; }
+
+.receipt-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+}
+
+.receipt-info .label {
   color: #666;
+  font-size: 0.85em;
+  margin-bottom: 3px;
+}
+
+.receipt-info .value {
+  font-weight: bold;
+  font-size: 1em;
+}
+
+.receipt-image {
+  text-align: center;
+}
+
+.receipt-image img {
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.receipt-image img:hover {
+  transform: scale(1.05);
+}
+
+.receipt-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.btn-approve, .btn-reject {
+  padding: 10px 25px;
+  border: none;
+  border-radius: 10px;
+  font-size: 1em;
+  font-weight: bold;
+  cursor: pointer;
+  transition: 0.3s;
+  font-family: inherit;
+}
+
+.btn-approve {
+  background: #27ae60;
+  color: white;
+}
+
+.btn-approve:hover {
+  background: #229954;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(39, 174, 96, 0.4);
+}
+
+.btn-reject {
+  background: #e74c3c;
+  color: white;
+}
+
+.btn-reject:hover {
+  background: #c0392b;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
 }
 
 footer {
@@ -310,5 +406,11 @@ footer {
     flex-direction: column;
     gap: 15px;
     text-align: center;
+  }
+  .receipt-info {
+    grid-template-columns: 1fr 1fr;
+  }
+  .receipt-actions {
+    flex-direction: column;
   }
 }
