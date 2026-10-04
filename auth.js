@@ -1,5 +1,5 @@
 // ========================================
-// auth.js - Supabase Auth
+// auth.js - Supabase Auth with Email Linking
 // ========================================
 
 const SUPABASE_URL = 'https://ymzvhsrbmmmxxzqrmguz.supabase.co';
@@ -13,7 +13,7 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 async function handleLogin(e) {
   e.preventDefault();
 
-  const email = document.getElementById('email').value.trim();
+  const email = document.getElementById('email').value.trim().toLowerCase();
   const password = document.getElementById('password').value;
   const errorMsg = document.getElementById('error-msg');
   const successMsg = document.getElementById('success-msg');
@@ -25,6 +25,7 @@ async function handleLogin(e) {
   btn.textContent = '⏳ جارٍ التحقق...';
 
   try {
+    // 1. تسجيل الدخول عبر Supabase Auth
     const { data, error } = await supabaseClient.auth.signInWithPassword({
       email: email,
       password: password
@@ -32,30 +33,23 @@ async function handleLogin(e) {
 
     if (error) throw error;
 
-    // البحث عن متجر المستخدم
-    const { data: userData, error: userError } = await supabaseClient
-      .from('users')
-      .select('shop_id')
+    // 2. البحث عن المتجر بالبريد
+    const { data: shop, error: shopError } = await supabaseClient
+      .from('shops')
+      .select('id, name, emoji')
       .eq('email', email)
       .single();
 
-    if (userError || !userData) {
-      // إذا لم يكن هناك صف في users، ننشئه
-      const shopId = prompt('أدخل معرف متجرك (Shop ID):');
-      if (shopId) {
-        await supabaseClient.from('users').insert([{
-          email: email,
-          shop_id: parseInt(shopId),
-          password_hash: 'supabase_auth'
-        }]);
-      }
+    if (shopError || !shop) {
+      throw new Error('لم يتم العثور على متجر مرتبط بهذا البريد. سجلي متجرك في البوت أولاً.');
     }
 
-    // حفظ الجلسة
+    // 3. حفظ الجلسة
     localStorage.setItem('atmata_user', JSON.stringify({
       id: data.user.id,
       email: data.user.email,
-      shop_id: userData?.shop_id || null,
+      shop_id: shop.id,
+      shop_name: shop.name,
       login_at: new Date().toISOString()
     }));
 
@@ -63,9 +57,15 @@ async function handleLogin(e) {
 
   } catch (err) {
     console.error('خطأ:', err);
-    errorMsg.textContent = '⚠️ ' + (err.message === 'Invalid login credentials' 
-      ? 'البريد الإلكتروني أو كلمة المرور غير صحيحة' 
-      : err.message);
+    let errorMessage = err.message;
+    
+    if (err.message === 'Invalid login credentials') {
+      errorMessage = 'البريد الإلكتروني أو كلمة المرور غير صحيحة';
+    } else if (err.message === 'Email not confirmed') {
+      errorMessage = 'البريد الإلكتروني لم يتم تأكيده';
+    }
+
+    errorMsg.textContent = '⚠️ ' + errorMessage;
     errorMsg.classList.remove('hidden');
     btn.disabled = false;
     btn.textContent = '🔐 تسجيل الدخول';
@@ -73,14 +73,13 @@ async function handleLogin(e) {
 }
 
 // ========================================
-// التسجيل
+// التسجيل (بدون Shop ID)
 // ========================================
 async function handleRegister(e) {
   e.preventDefault();
 
-  const email = document.getElementById('email').value.trim();
+  const email = document.getElementById('email').value.trim().toLowerCase();
   const password = document.getElementById('password').value;
-  const shopId = parseInt(document.getElementById('shop_id').value);
   const errorMsg = document.getElementById('error-msg');
   const successMsg = document.getElementById('success-msg');
   const btn = document.getElementById('register-btn');
@@ -95,22 +94,18 @@ async function handleRegister(e) {
       throw new Error('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
     }
 
-    if (isNaN(shopId) || shopId < 1) {
-      throw new Error('معرف المتجر غير صحيح');
-    }
-
-    // التحقق من وجود المتجر
+    // 1. التحقق من وجود المتجر بالبريد
     const { data: shop, error: shopError } = await supabaseClient
       .from('shops')
-      .select('id, name')
-      .eq('id', shopId)
+      .select('id, name, emoji')
+      .eq('email', email)
       .single();
 
     if (shopError || !shop) {
-      throw new Error('لم يتم العثور على المتجر. تحقق من Shop ID');
+      throw new Error('لم يتم العثور على متجر مرتبط بهذا البريد. سجلي متجرك في البوت أولاً عبر /register');
     }
 
-    // إنشاء الحساب في Supabase Auth
+    // 2. إنشاء الحساب في Supabase Auth
     const { data: authData, error: authError } = await supabaseClient.auth.signUp({
       email: email,
       password: password
@@ -118,25 +113,25 @@ async function handleRegister(e) {
 
     if (authError) throw authError;
 
-    // حفظ بيانات المستخدم في جدول users
+    // 3. حفظ بيانات المستخدم في جدول users
     const { error: dbError } = await supabaseClient
       .from('users')
       .insert([{
         email: email,
         password_hash: 'supabase_auth',
-        shop_id: shopId
+        shop_id: shop.id
       }]);
 
     if (dbError && !dbError.message.includes('duplicate')) {
       throw dbError;
     }
 
-    successMsg.innerHTML = `✅ تم إنشاء الحساب!<br><small>مرحباً ${shop.name}. تحققي من بريدك لتأكيد الحساب.</small>`;
+    successMsg.innerHTML = `✅ تم إنشاء الحساب!<br><small>مرحباً ${shop.name}. سيتم تحويلك لتسجيل الدخول...</small>`;
     successMsg.classList.remove('hidden');
 
     setTimeout(() => {
       window.location.href = 'login.html';
-    }, 3000);
+    }, 2500);
 
   } catch (err) {
     console.error('خطأ:', err);
