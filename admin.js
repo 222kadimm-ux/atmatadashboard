@@ -1,5 +1,5 @@
 // ========================================
-// admin.js - لوحة الإدارة
+// admin.js - لوحة الإدارة مع تفعيل الإيصالات
 // ========================================
 
 const SUPABASE_URL = 'https://ymzvhsrbmmmxxzqrmguz.supabase.co';
@@ -84,16 +84,21 @@ async function loadGlobalStats() {
     const { data: shops } = await supabaseClient.from('shops').select('id');
     const { data: orders } = await supabaseClient.from('orders').select('total');
     const { data: users } = await supabaseClient.from('users').select('id');
+    const { data: receipts } = await supabaseClient.from('receipts').select('id').eq('status', 'pending');
 
-    const totalShops = shops?.length || 0;
-    const totalOrders = orders?.length || 0;
-    const totalRevenue = orders?.reduce((sum, o) => sum + (o.total || 0), 0) || 0;
-    const totalUsers = users?.length || 0;
-
-    document.getElementById('total-shops').textContent = totalShops;
-    document.getElementById('total-orders').textContent = totalOrders;
-    document.getElementById('total-revenue').textContent = totalRevenue.toLocaleString('ar-DZ');
-    document.getElementById('total-users').textContent = totalUsers;
+    document.getElementById('total-shops').textContent = shops?.length || 0;
+    document.getElementById('total-orders').textContent = orders?.length || 0;
+    document.getElementById('total-revenue').textContent = 
+      (orders?.reduce((sum, o) => sum + (o.total || 0), 0) || 0).toLocaleString('ar-DZ');
+    document.getElementById('total-users').textContent = users?.length || 0;
+    
+    // عدد الإيصالات المعلقة
+    const pendingCount = receipts?.length || 0;
+    const receiptsBadge = document.getElementById('receipts-count');
+    if (receiptsBadge) {
+      receiptsBadge.textContent = pendingCount;
+      receiptsBadge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
+    }
   } catch (err) {
     console.error('خطأ:', err);
   }
@@ -122,26 +127,32 @@ async function loadShops() {
     data.forEach(shop => {
       const card = document.createElement('div');
       card.className = 'data-card';
+      const planBadge = {
+        free: '🆓 مجاني',
+        basic: '⭐ أساسي',
+        pro: '👑 احترافي'
+      }[shop.plan] || '🆓 مجاني';
+
+      const endDate = shop.subscription_end 
+        ? new Date(shop.subscription_end).toLocaleDateString('ar-DZ')
+        : '—';
+
       card.innerHTML = `
         <div>
           <div class="label">المتجر</div>
           <div class="value">${shop.emoji || '🏪'} ${shop.name}</div>
         </div>
         <div>
-          <div class="label">اسم المستخدم</div>
-          <div class="value">@${shop.username}</div>
-        </div>
-        <div>
-          <div class="label">الهاتف</div>
-          <div class="value">${shop.phone || '—'}</div>
+          <div class="label">البريد</div>
+          <div class="value">${shop.email || '—'}</div>
         </div>
         <div>
           <div class="label">الخطة</div>
-          <div class="value">
-            <span class="badge badge-${shop.plan || 'free'}">
-              ${shop.plan === 'pro' ? '👑 احترافي' : shop.plan === 'basic' ? '⭐ أساسي' : '🆓 مجاني'}
-            </span>
-          </div>
+          <div class="value"><span class="badge badge-${shop.plan || 'free'}">${planBadge}</span></div>
+        </div>
+        <div>
+          <div class="label">ينتهي</div>
+          <div class="value">${endDate}</div>
         </div>
       `;
       list.appendChild(card);
@@ -150,6 +161,200 @@ async function loadShops() {
     console.error('خطأ:', err);
   }
 }
+
+// ========================================
+// تحميل الإيصالات المعلقة
+// ========================================
+async function loadReceipts() {
+  try {
+    const { data, error } = await supabaseClient
+      .from('receipts')
+      .select(`
+        *,
+        shops:shop_id (name, emoji, email)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    const list = document.getElementById('receipts-list');
+    list.innerHTML = '';
+
+    if (!data || data.length === 0) {
+      list.innerHTML = '<p style="text-align:center;color:#666;padding:20px;">📭 لا توجد إيصالات</p>';
+      return;
+    }
+
+    data.forEach(receipt => {
+      const card = document.createElement('div');
+      card.className = `receipt-card receipt-${receipt.status}`;
+
+      const statusBadge = {
+        pending: '⏳ قيد المراجعة',
+        approved: '✅ مفعّل',
+        rejected: '❌ مرفوض'
+      }[receipt.status] || 'غير معروف';
+
+      const planName = {
+        basic: '⭐ أساسي',
+        pro: '👑 احترافي'
+      }[receipt.plan] || receipt.plan;
+
+      const shopName = receipt.shops?.name || '—';
+      const shopEmoji = receipt.shops?.emoji || '🏪';
+      const shopEmail = receipt.shops?.email || '—';
+
+      const createdDate = new Date(receipt.created_at).toLocaleString('ar-DZ');
+
+      let actionsHtml = '';
+      if (receipt.status === 'pending') {
+        actionsHtml = `
+          <div class="receipt-actions">
+            <button class="btn-approve" onclick="approveReceipt(${receipt.id}, ${receipt.shop_id}, '${receipt.plan}', ${receipt.amount})">
+              ✅ تفعيل
+            </button>
+            <button class="btn-reject" onclick="rejectReceipt(${receipt.id})">
+              ❌ رفض
+            </button>
+          </div>
+        `;
+      }
+
+      card.innerHTML = `
+        <div class="receipt-info">
+          <div>
+            <div class="label">المتجر</div>
+            <div class="value">${shopEmoji} ${shopName}</div>
+          </div>
+          <div>
+            <div class="label">البريد</div>
+            <div class="value">${shopEmail}</div>
+          </div>
+          <div>
+            <div class="label">الخطة</div>
+            <div class="value">${planName}</div>
+          </div>
+          <div>
+            <div class="label">المبلغ</div>
+            <div class="value">${receipt.amount.toLocaleString('ar-DZ')} د.ج</div>
+          </div>
+          <div>
+            <div class="label">التاريخ</div>
+            <div class="value">${createdDate}</div>
+          </div>
+          <div>
+            <div class="label">الحالة</div>
+            <div class="value">${statusBadge}</div>
+          </div>
+        </div>
+        ${receipt.image_url ? `
+          <div class="receipt-image">
+            <a href="${receipt.image_url}" target="_blank">
+              <img src="${receipt.image_url}" alt="إيصال" loading="lazy">
+            </a>
+          </div>
+        ` : ''}
+        ${actionsHtml}
+      `;
+      list.appendChild(card);
+    });
+  } catch (err) {
+    console.error('خطأ تحميل الإيصالات:', err);
+  }
+}
+
+// ========================================
+// تفعيل إيصال
+// ========================================
+window.approveReceipt = async function(receiptId, shopId, plan, amount) {
+  if (!confirm('هل تريد تفعيل هذا الاشتراك؟')) return;
+
+  try {
+    // 1. تحديث حالة الإيصال
+    const { error: receiptError } = await supabaseClient
+      .from('receipts')
+      .update({ 
+        status: 'approved',
+        reviewed_at: new Date().toISOString()
+      })
+      .eq('id', receiptId);
+
+    if (receiptError) throw receiptError;
+
+    // 2. تفعيل اشتراك المتجر
+    const newEndDate = new Date();
+    newEndDate.setMonth(newEndDate.getMonth() + 1);
+
+    const limits = {
+      basic: 100,
+      pro: 999999
+    };
+
+    const { error: shopError } = await supabaseClient
+      .from('shops')
+      .update({
+        plan: plan,
+        subscription_status: 'active',
+        subscription_start: new Date().toISOString(),
+        subscription_end: newEndDate.toISOString(),
+        orders_limit: limits[plan] || 100,
+        orders_this_month: 0
+      })
+      .eq('id', shopId);
+
+    if (shopError) throw shopError;
+
+    // 3. إضافة سجل الاشتراك
+    await supabaseClient
+      .from('subscriptions')
+      .insert([{
+        shop_id: shopId,
+        plan: plan,
+        amount: amount,
+        status: 'active',
+        started_at: new Date().toISOString(),
+        expires_at: newEndDate.toISOString(),
+        payment_method: 'ccp_baridimob'
+      }]);
+
+    alert('✅ تم تفعيل الاشتراك بنجاح!');
+    await loadReceipts();
+    await loadGlobalStats();
+
+  } catch (err) {
+    console.error('خطأ:', err);
+    alert('⚠️ خطأ: ' + err.message);
+  }
+};
+
+// ========================================
+// رفض إيصال
+// ========================================
+window.rejectReceipt = async function(receiptId) {
+  const note = prompt('سبب الرفض (اختياري):');
+  if (note === null) return;
+
+  try {
+    const { error } = await supabaseClient
+      .from('receipts')
+      .update({ 
+        status: 'rejected',
+        admin_note: note || 'مرفوض',
+        reviewed_at: new Date().toISOString()
+      })
+      .eq('id', receiptId);
+
+    if (error) throw error;
+
+    alert('✅ تم رفض الإيصال');
+    await loadReceipts();
+    await loadGlobalStats();
+
+  } catch (err) {
+    console.error('خطأ:', err);
+    alert('⚠️ خطأ: ' + err.message);
+  }
+};
 
 // ========================================
 // تحميل الطلبات
@@ -197,9 +402,7 @@ async function loadOrders() {
         </div>
         <div>
           <div class="label">الحالة</div>
-          <div class="value">
-            <span class="badge badge-${order.status || 'pending'}">${statusText}</span>
-          </div>
+          <div class="value"><span class="badge badge-${order.status || 'pending'}">${statusText}</span></div>
         </div>
       `;
       list.appendChild(card);
@@ -284,17 +487,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       const target = tab.dataset.tab;
       document.getElementById(`tab-${target}`).classList.remove('hidden');
 
-      // إخفاء التحميل
-      document.querySelectorAll('.loading').forEach(l => l.classList.add('hidden'));
-
-      // تحميل البيانات
       if (target === 'shops') loadShops();
       if (target === 'orders') loadOrders();
       if (target === 'users') loadUsers();
+      if (target === 'receipts') loadReceipts();
     });
   });
 
   // تحميل أولي
   await loadGlobalStats();
-  await loadShops();
+  await loadReceipts();
 });
