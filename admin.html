@@ -49,23 +49,28 @@
     </div>
 
     <div class="tabs">
-      <button class="tab active" data-tab="shops">🏪 المتاجر</button>
+      <button class="tab active" data-tab="receipts">
+        💳 الإيصالات
+        <span id="receipts-count" class="badge-count" style="display:none;">0</span>
+      </button>
+      <button class="tab" data-tab="shops">🏪 المتاجر</button>
       <button class="tab" data-tab="orders">📦 الطلبات</button>
       <button class="tab" data-tab="users">👥 المستخدمون</button>
     </div>
 
-    <div id="tab-shops" class="tab-content active">
-      <div class="loading">⏳ جارٍ التحميل...</div>
+    <div id="tab-receipts" class="tab-content active">
+      <div id="receipts-list" class="data-list"></div>
+    </div>
+
+    <div id="tab-shops" class="tab-content hidden">
       <div id="shops-list" class="data-list"></div>
     </div>
 
     <div id="tab-orders" class="tab-content hidden">
-      <div class="loading">⏳ جارٍ التحميل...</div>
       <div id="orders-list" class="data-list"></div>
     </div>
 
     <div id="tab-users" class="tab-content hidden">
-      <div class="loading">⏳ جارٍ التحميل...</div>
       <div id="users-list" class="data-list"></div>
     </div>
 
