@@ -9,8 +9,21 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
   <script>
     (function() {
-      const user = localStorage.getItem('atmata_user');
-      if (!user) {
+      const userStr = localStorage.getItem('atmata_user');
+      if (!userStr) {
+        window.location.href = 'login.html';
+        return;
+      }
+      
+      try {
+        const user = JSON.parse(userStr);
+        // التحقق من انتهاء الجلسة (24 ساعة)
+        if (user.expires_at && Date.now() > user.expires_at) {
+          localStorage.removeItem('atmata_user');
+          window.location.href = 'login.html';
+        }
+      } catch (e) {
+        localStorage.removeItem('atmata_user');
         window.location.href = 'login.html';
       }
     })();
@@ -35,7 +48,6 @@
     <div id="loading" class="loading">⏳ جارٍ التحميل...</div>
 
     <div id="dashboard" class="dashboard hidden">
-      <!-- الإحصائيات السريعة -->
       <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-icon">📦</div>
@@ -59,7 +71,6 @@
         </div>
       </div>
 
-      <!-- إحصائيات الأسبوع والشهر -->
       <div class="stats-grid" style="margin-top:15px;">
         <div class="stat-card highlight">
           <div class="stat-icon">📅</div>
@@ -83,21 +94,17 @@
         </div>
       </div>
 
-      <!-- رسم بياني للمبيعات -->
       <h2 style="margin-top:30px;">📈 المبيعات (آخر 7 أيام)</h2>
       <div class="chart-container">
         <canvas id="sales-chart"></canvas>
       </div>
 
-      <!-- المنتجات الأكثر مبيعاً -->
       <h2 style="margin-top:30px;">🏆 المنتجات الأكثر مبيعاً</h2>
       <div id="top-products" class="top-list"></div>
 
-      <!-- العملاء الأكثر شراءً -->
       <h2 style="margin-top:30px;">👑 العملاء الأكثر شراءً</h2>
       <div id="top-customers" class="top-list"></div>
 
-      <!-- الطلبات الأخيرة -->
       <h2 style="margin-top:30px;">📋 الطلبات الأخيرة</h2>
       <div id="orders-list" class="orders-list"></div>
     </div>
