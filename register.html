@@ -15,6 +15,15 @@
         <p>إنشاء حساب جديد</p>
       </div>
 
+      <div style="background:#eef1ff; padding:15px; border-radius:10px; margin-bottom:20px; font-size:0.9em; color:#555;">
+        <strong>⚠️ قبل التسجيل:</strong><br>
+        تأكدي من أنك سجلتِ متجرك في البوت أولاً:<br>
+        <a href="https://t.me/SanadBot2026_bot" target="_blank" style="color:#667eea;">
+          t.me/SanadBot2026_bot
+        </a><br><br>
+        استخدمي <strong>نفس البريد الإلكتروني</strong> الذي أدخلتِه في البوت.
+      </div>
+
       <form id="register-form">
         <div class="form-group">
           <label for="email">البريد الإلكتروني:</label>
@@ -24,12 +33,6 @@
         <div class="form-group">
           <label for="password">كلمة المرور:</label>
           <input type="password" id="password" required placeholder="6 أحرف على الأقل" minlength="6">
-        </div>
-
-        <div class="form-group">
-          <label for="shop_id">معرف المتجر (Shop ID):</label>
-          <input type="number" id="shop_id" required placeholder="مثال: 1">
-          <small>احصل عليه من البوت عبر /mystats</small>
         </div>
 
         <div id="error-msg" class="error-msg hidden"></div>
