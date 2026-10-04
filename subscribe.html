@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>اشترك - أتمتة</title>
+  <link rel="stylesheet" href="subscribe.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    (function() {
+      const user = localStorage.getItem('atmata_user');
+      if (!user) {
+        window.location.href = 'login.html';
+      }
+    })();
+  </script>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>💎 ترقية اشتراكك</h1>
+      <p class="subtitle">اختر الباقة المناسبة لمتجرك</p>
+      <button id="back-btn" class="btn-back">⬅️ رجوع</button>
+    </header>
+
+    <div id="loading" class="loading">⏳ جارٍ التحميل...</div>
+
+    <div id="content" class="hidden">
+      <!-- معلومات الاشتراك الحالي -->
+      <div id="current-plan" class="current-plan"></div>
+
+      <!-- الباقات -->
+      <div class="plans-grid">
+        <div class="plan-card" data-plan="basic">
+          <div class="plan-header">
+            <h2>⭐ أساسي</h2>
+            <div class="plan-price">
+              <span class="price">2,500</span>
+              <span class="currency">د.ج/شهر</span>
+            </div>
+          </div>
+          <ul class="plan-features">
+            <li>✅ 100 طلب شهرياً</li>
+            <li>✅ دعم فني</li>
+            <li>✅ تقارير أساسية</li>
+            <li>✅ إشعارات فورية</li>
+          </ul>
+          <button class="btn-select" data-plan="basic" data-amount="2500">
+            اختر هذه الباقة
+          </button>
+        </div>
+
+        <div class="plan-card pro" data-plan="pro">
+          <div class="plan-badge">الأكثر طلباً</div>
+          <div class="plan-header">
+            <h2>👑 احترافي</h2>
+            <div class="plan-price">
+              <span class="price">5,000</span>
+              <span class="currency">د.ج/شهر</span>
+            </div>
+          </div>
+          <ul class="plan-features">
+            <li>✅ طلبات غير محدودة</li>
+            <li>✅ دعم فني أولوية</li>
+            <li>✅ تقارير متقدمة</li>
+            <li>✅ إشعارات فورية</li>
+            <li>✅ تصدير Excel</li>
+          </ul>
+          <button class="btn-select" data-plan="pro" data-amount="5000">
+            اختر هذه الباقة
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- نافذة الدفع -->
+    <div id="payment-modal" class="modal hidden">
+      <div class="modal-content">
+        <button class="modal-close" id="close-modal">✖️</button>
+        
+        <h2>💳 إتمام الدفع</h2>
+        
+        <div class="payment-info">
+          <h3>معلومات الدفع</h3>
+          <div class="payment-details">
+            <div class="payment-row">
+              <span>📮 CCP:</span>
+              <strong id="ccp-display">جارٍ التحميل...</strong>
+            </div>
+            <div class="payment-row">
+              <span>📱 BaridiMob:</span>
+              <strong id="baridimob-display">جارٍ التحميل...</strong>
+            </div>
+            <div class="payment-row">
+              <span>💰 المبلغ:</span>
+              <strong id="amount-display">0 د.ج</strong>
+            </div>
+            <div class="payment-row">
+              <span>📦 الباقة:</span>
+              <strong id="plan-display">—</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="upload-section">
+          <h3>📸 رفع صورة الإيصال</h3>
+          <p class="upload-hint">بعد التحويل، ارفعي صورة الإيصال هنا</p>
+          
+          <input type="file" id="receipt-file" accept="image/*" class="hidden">
+          <label for="receipt-file" class="upload-btn">
+            📁 اختاري صورة الإيصال
+          </label>
+          
+          <div id="preview" class="preview hidden">
+            <img id="preview-img" src="" alt="معاينة">
+            <button id="remove-image" class="btn-remove">✖️ إزالة</button>
+          </div>
+        </div>
+
+        <div id="payment-error" class="error-msg hidden"></div>
+        <div id="payment-success" class="success-msg hidden"></div>
+
+        <button id="submit-receipt" class="btn-primary" disabled>
+          ✅ إرسال الإيصال
+        </button>
+      </div>
+    </div>
+
+    <footer>
+      <p>© 2026 أتمتة - جميع الحقوق محفوظة</p>
+    </footer>
+  </div>
+
+  <script src="subscribe.js"></script>
+</body>
+</html>
