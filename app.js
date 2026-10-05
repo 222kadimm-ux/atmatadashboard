@@ -1,4 +1,30 @@
 // ========================================
+// Sentry - تتبع الأخطاء
+// ========================================
+(function() {
+  const script = document.createElement('script');
+  script.src = 'https://js-de.sentry-cdn.com/6944f37c10e7df05c045f6e4d3de2f7f.min.js';
+  script.crossOrigin = 'anonymous';
+  script.onload = function() {
+    if (window.Sentry) {
+      window.Sentry.init({
+        dsn: 'https://6944f37c10e7df05c045f6e4d3de2f7f@o4512204967837696.ingest.de.sentry.io/4512205009256528',
+        environment: 'production',
+        tracesSampleRate: 0.1,
+        beforeSend(event) {
+          if (event.message && event.message.includes('message is not modified')) {
+            return null;
+          }
+          return event;
+        }
+      });
+      console.log('✅ Sentry initialized');
+    }
+  };
+  document.head.appendChild(script);
+})();
+
+// ========================================
 // app.js - لوحة التحكم مع Error Handling
 // ========================================
 
@@ -17,10 +43,15 @@ let salesChart = null;
 function handleError(error, context = '') {
   console.error(`[${context}]`, error);
   
-  // رسالة عامة للمستخدم (لا تكشف التفاصيل)
+  if (window.Sentry && window.Sentry.captureException) {
+    window.Sentry.captureException(error, {
+      tags: { context },
+      extra: { context }
+    });
+  }
+  
   const userMessage = '⚠️ حدث خطأ. حاول تحديث الصفحة.';
   
-  // إذا كانت الجلسة منتهية
   if (error?.message?.includes('JWT') || error?.message?.includes('auth')) {
     localStorage.removeItem('atmata_user');
     window.location.href = 'login.html';
@@ -43,7 +74,6 @@ function loadUser() {
   try {
     const user = JSON.parse(userStr);
     
-    // التحقق من انتهاء الجلسة
     if (user.expires_at && Date.now() > user.expires_at) {
       localStorage.removeItem('atmata_user');
       window.location.href = 'login.html';
