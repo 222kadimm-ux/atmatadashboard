@@ -1,4 +1,3 @@
-// api/receipts.js - API آمن للإيصالات (قراءة + تفعيل)
 const { createClient } = require('@supabase/supabase-js');
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ymzvhsrbmmmxxzqrmguz.supabase.co';
@@ -9,22 +8,14 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-admin-token');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
+  if (req.method === 'OPTIONS') return res.status(200).end();
 
   const adminToken = req.headers['x-admin-token'];
-  if (!adminToken) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  if (!SUPABASE_SERVICE_KEY) {
-    return res.status(500).json({ error: 'Service key not configured' });
-  }
+  if (!adminToken) return res.status(401).json({ error: 'Unauthorized' });
+  if (!SUPABASE_SERVICE_KEY) return res.status(500).json({ error: 'Service key not configured' });
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-  // ========== GET: جلب كل الإيصالات ==========
   if (req.method === 'GET') {
     try {
       const { data, error } = await supabase
@@ -34,7 +25,6 @@ module.exports = async (req, res) => {
 
       if (error) throw error;
 
-      // جلب معلومات المتاجر
       if (data && data.length > 0) {
         const shopIds = [...new Set(data.map(r => r.shop_id))];
         const { data: shops } = await supabase
@@ -44,20 +34,15 @@ module.exports = async (req, res) => {
 
         const shopsMap = {};
         (shops || []).forEach(s => { shopsMap[s.id] = s; });
-
-        data.forEach(r => {
-          r.shops = shopsMap[r.shop_id] || null;
-        });
+        data.forEach(r => { r.shops = shopsMap[r.shop_id] || null; });
       }
 
       return res.status(200).json({ data });
     } catch (err) {
-      console.error('خطأ:', err);
       return res.status(500).json({ error: err.message });
     }
   }
 
-  // ========== POST: تفعيل/رفض إيصال ==========
   if (req.method === 'POST') {
     try {
       const { receipt_id, status, shop_id, plan, amount, admin_note } = req.body;
@@ -66,7 +51,6 @@ module.exports = async (req, res) => {
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
-      // 1. تحديث حالة الإيصال
       const { error: receiptError } = await supabase
         .from('receipts')
         .update({
@@ -78,14 +62,12 @@ module.exports = async (req, res) => {
 
       if (receiptError) throw receiptError;
 
-      // 2. إذا تم التفعيل، فعّل الاشتراك
       if (status === 'approved' && shop_id && plan) {
         const endDate = new Date();
         endDate.setMonth(endDate.getMonth() + 1);
-
         const limits = { basic: 100, pro: 999999 };
 
-        const { error: shopError } = await supabase
+        await supabase
           .from('shops')
           .update({
             plan,
@@ -97,9 +79,6 @@ module.exports = async (req, res) => {
           })
           .eq('id', shop_id);
 
-        if (shopError) throw shopError;
-
-        // 3. إضافة سجل الاشتراك
         await supabase
           .from('subscriptions')
           .insert([{
@@ -115,7 +94,6 @@ module.exports = async (req, res) => {
 
       return res.status(200).json({ success: true });
     } catch (err) {
-      console.error('خطأ:', err);
       return res.status(500).json({ error: err.message });
     }
   }
